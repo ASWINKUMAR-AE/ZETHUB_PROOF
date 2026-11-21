@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Full verification (Ubuntu + MariaDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: zethub_proof_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      SESSION_SECRET: 'ci-session-secret-4f3c2b1a9e8d7c6b5a4938271605f4e3'
+      API_HOST: 127.0.0.1
+      API_PORT: '4000'
+      ALLOWED_ORIGINS: 'http://127.0.0.1:4000,http://localhost:4000,http://127.0.0.1:5173,http://localhost:5173'
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: zethub_proof_ci
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_ADMIN_USER: root
+      DB_ADMIN_PASSWORD: root
+      # zethub-secret-scan:ignore-next-line disposable CI service-container credential
+      DATABASE_URL: 'mysql://root:root@127.0.0.1:3306/zethub_proof_ci?connection_limit=5&pool_timeout=20&connect_timeout=10'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Create disposable test database
+        shell: bash
+        run: |
+          node -e "const mysql=require('mysql2/promise');(async()=>{const c=await mysql.createConnection({host:'127.0.0.1',port:3306,user:'root',password:'root'});await c.query('CREATE DATABASE IF NOT EXISTS zethub_proof_ci_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');await c.end();})().catch((e)=>{console.error(e);process.exit(1);});"
+
+      - name: Apply migrations to application and test databases
+        shell: bash
+        run: |
+          npx prisma migrate deploy --schema prisma/schema.prisma
+          # zethub-secret-scan:ignore-next-line disposable CI service-container credential
+          DATABASE_URL='mysql://root:root@127.0.0.1:3306/zethub_proof_ci_test?connection_limit=5&pool_timeout=20&connect_timeout=10' \
+            npx prisma migrate deploy --schema prisma/schema.prisma
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify everything
+        run: npm run verify:all
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-artifacts-ubuntu
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows-smoke:
+    name: Windows smoke (no database)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      SESSION_SECRET: 'ci-session-secret-4f3c2b1a9e8d7c6b5a4938271605f4e3'
+      DB_PASSWORD: root
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Production build
+        run: npm run build

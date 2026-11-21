@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ZetHub Proof Capture",
+  "version": "0.1.0",
+  "description": "Capture the current page as a reviewable ZetHub Proof browser scenario.",
+  "permissions": ["activeTab", "storage", "scripting", "contextMenus"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Capture for ZetHub Proof",
+    "default_popup": "popup.html"
+  },
+  "commands": {
+    "capture-page": {
+      "suggested_key": { "default": "Alt+Shift+Z" },
+      "description": "Capture the current page"
+    }
+  }
+}

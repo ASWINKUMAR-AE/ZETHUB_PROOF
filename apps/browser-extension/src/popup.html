@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZetHub Proof Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">ZetHub Proof</p>
+        <h1>Capture a page</h1>
+      </div>
+      <a id="openApp" href="http://127.0.0.1:4000/" title="Open ZetHub Proof">Open app</a>
+    </header>
+
+    <section class="card">
+      <h2>1. Local API</h2>
+      <label for="apiUrl">API URL</label>
+      <input id="apiUrl" type="url" value="http://127.0.0.1:4000" spellcheck="false" />
+      <label for="token">Device token</label>
+      <input id="token" type="password" placeholder="Create one in ZetHub Proof → Settings" autocomplete="off" />
+      <div class="row">
+        <button id="saveSettings" type="button">Save settings</button>
+        <button id="testConnection" type="button" class="secondary">Test connection</button>
+      </div>
+      <p class="hint">The token is stored only in this browser profile and is sent only to the loopback API.</p>
+    </section>
+
+    <section class="card">
+      <h2>2. Page capture</h2>
+      <button id="capture" type="button" class="primary">Capture current tab</button>
+      <button id="clearCapture" type="button" class="link">Clear local capture</button>
+      <pre id="preview" aria-live="polite">No capture yet. Open a web page and choose “Capture current tab”.</pre>
+      <div class="row">
+        <button id="download" type="button" class="secondary" disabled>Download JSON</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Save as a test case</h2>
+      <label for="project">Project</label>
+      <div class="row">
+        <select id="project">
+          <option value="">Load projects first</option>
+        </select>
+        <button id="loadProjects" type="button" class="secondary">Load</button>
+      </div>
+      <label for="caseKey">Case key</label>
+      <input id="caseKey" type="text" maxlength="190" spellcheck="false" />
+      <label for="caseTitle">Case title</label>
+      <input id="caseTitle" type="text" maxlength="255" />
+      <button id="save" type="button" class="primary" disabled>Save case for review</button>
+      <p class="hint">Saving creates a browser scenario. It never runs automatically and never stores credentials.</p>
+    </section>
+
+    <div id="status" class="status info" role="status" aria-live="polite"></div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

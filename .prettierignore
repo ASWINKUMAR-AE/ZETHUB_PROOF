@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+out
+coverage
+artifacts
+data
+backups
+release
+.tmp
+test-results
+playwright-report
+blob-report
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen
+prisma/generated
+package-lock.json

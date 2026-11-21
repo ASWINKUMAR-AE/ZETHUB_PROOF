@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --ring: 199 195 240;
+  --surface-glow: rgba(91, 91, 207, 0.16);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a58 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: #32324d;
+  border-radius: 999px;
+  border: 2px solid #0e0e15;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4b4b74;
+}
+
+body {
+  @apply bg-ink-950 text-slate-200 font-sans antialiased;
+  background-image:
+    radial-gradient(1200px 700px at 8% -12%, rgba(199, 195, 240, 0.15), transparent 58%),
+    radial-gradient(900px 560px at 96% -4%, rgba(72, 73, 169, 0.2), transparent 62%),
+    radial-gradient(1000px 700px at 62% 115%, rgba(216, 90, 74, 0.09), transparent 65%),
+    linear-gradient(168deg, #101018 0%, #12121c 42%, #0d0d14 100%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(199, 195, 240, 0.32);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(199, 195, 240, 0.7);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .app-ambient {
+    position: relative;
+    isolation: isolate;
+  }
+  .app-ambient::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(620px 420px at 14% 20%, rgba(72, 73, 169, 0.18), transparent 62%),
+      radial-gradient(520px 380px at 88% 82%, rgba(216, 90, 74, 0.1), transparent 66%);
+  }
+
+  .panel {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.035] backdrop-blur-xl shadow-panel;
+    background-image: linear-gradient(
+      158deg,
+      rgba(199, 195, 240, 0.06) 0%,
+      rgba(37, 38, 92, 0.09) 52%,
+      rgba(216, 90, 74, 0.028) 100%
+    );
+  }
+  .panel-soft {
+    @apply rounded-2xl border border-white/[0.06] bg-white/[0.022] backdrop-blur-md;
+  }
+  .glass {
+    @apply rounded-2xl border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl;
+    box-shadow:
+      0 24px 70px -40px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  }
+  .glass-soft {
+    @apply rounded-2xl border border-white/[0.06] bg-white/[0.025] backdrop-blur-md;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  }
+  .topbar-glass {
+    @apply border border-white/[0.08] bg-ink-900/65 backdrop-blur-xl;
+    box-shadow:
+      0 18px 45px -32px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .logo-orb {
+    background: linear-gradient(145deg, #8a88d9 0%, #4849a9 46%, #25265c 100%);
+    border: 1px solid rgba(199, 195, 240, 0.32);
+    box-shadow:
+      0 0 0 1px rgba(199, 195, 240, 0.08),
+      0 14px 32px -14px rgba(72, 73, 169, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  .nav-pill-active {
+    background: linear-gradient(
+      90deg,
+      rgba(91, 91, 207, 0.35) 0%,
+      rgba(37, 38, 92, 0.28) 55%,
+      rgba(216, 90, 74, 0.08) 100%
+    );
+    border: 1px solid rgba(199, 195, 240, 0.16);
+    box-shadow:
+      0 0 0 1px rgba(199, 195, 240, 0.05),
+      0 14px 30px -18px rgba(72, 73, 169, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .label {
+    @apply block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/[0.09] bg-ink-900/80 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 outline-none transition focus:border-lavender/45 focus:ring-2 focus:ring-lavender/15 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .textarea {
+    @apply input min-h-[92px] resize-y font-mono text-[12.5px] leading-relaxed;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.035] px-2.5 py-0.5 text-[11px] font-medium text-slate-300;
+  }
+  .kbd {
+    @apply rounded border border-white/10 bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-slate-400;
+  }
+  .table-base {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-base th {
+    @apply whitespace-nowrap border-b border-white/[0.07] px-3 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted;
+  }
+  .table-base td {
+    @apply border-b border-white/[0.045] px-3 py-3 align-middle text-slate-300;
+  }
+  .table-base tbody tr {
+    @apply transition-colors hover:bg-white/[0.03];
+  }
+  .link {
+    @apply text-lavender underline-offset-4 transition hover:text-white hover:underline;
+  }
+  .skeleton {
+    @apply rounded-lg bg-gradient-to-r from-ink-800 via-ink-700 to-ink-800;
+    background-size: 800px 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+  .fade-in {
+    animation: fade-in 0.22s ease-out;
+  }
+}
+
+/* Recharts tuning for the lavender/indigo surfaces. */
+.recharts-cartesian-axis-tick-value {
+  fill: #9aa0c0;
+  font-size: 11px;
+}
+.recharts-cartesian-grid line {
+  stroke: #2a2a44;
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel,
+  .glass,
+  .glass-soft,
+  .topbar-glass {
+    background-color: #191924;
+    background-image: none;
+  }
+}

@@ -1,0 +1,598 @@
+// ZetHub Proof — MySQL 8.4 / MariaDB 10.4+ schema
+// All timestamps are stored in UTC. Large artifacts live outside the database;
+// only metadata, paths and hashes are stored here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  VIEWER
+}
+
+enum SourceType {
+  LOCAL
+  GIT
+  URL
+}
+
+enum HealthStatus {
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  FAILING
+}
+
+enum EnvironmentKind {
+  LOCAL
+  TEST
+  STAGING
+  PRODUCTION
+}
+
+enum PlanStrategy {
+  FULL
+  CHANGED
+  SELECTED
+}
+
+enum TestSource {
+  DETECTED
+  USER
+  AI
+}
+
+enum RunTrigger {
+  MANUAL
+  CLI
+  CI
+  REPAIR_RETEST
+  SCHEDULED
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  BLOCKED
+  CANCELLED
+  TIMEOUT
+  ERROR
+  UNVERIFIED
+}
+
+enum ResultStatus {
+  PASSED
+  FAILED
+  BLOCKED
+  CANCELLED
+  TIMEOUT
+  ERROR
+  SKIPPED
+  UNVERIFIED
+}
+
+enum EvidenceKind {
+  STDOUT
+  STDERR
+  SCREENSHOT
+  TRACE
+  VIDEO
+  JSON
+  HTML
+  JUNIT
+  DIFF
+  LOG
+  REPORT
+  CAPSULE
+}
+
+enum ReportFormat {
+  HTML
+  JSON
+  JUNIT
+}
+
+enum RepairStatus {
+  PROPOSED
+  APPROVED
+  APPLIED
+  REJECTED
+  VERIFIED
+  FAILED
+}
+
+enum IntegrationType {
+  GIT
+  GITHUB
+  BROWSER
+  AI
+  DATABASE
+  API
+  CI
+}
+
+enum CredentialStorage {
+  WINDOWS_DPAPI
+  LIBCREDENTIAL
+  ENCRYPTED_FILE
+  ENVIRONMENT
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  CONFLICT
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  PROJECT_CREATE
+  PROJECT_UPDATE
+  PROJECT_DELETE
+  SCAN
+  PLAN_CREATE
+  RUN_START
+  RUN_CANCEL
+  RUN_COMPLETE
+  REPORT_GENERATE
+  CAPSULE_EXPORT
+  CAPSULE_IMPORT
+  REPAIR_PROPOSE
+  REPAIR_APPLY
+  DB_SETUP
+  DB_MIGRATE
+  DB_BACKUP
+  DB_RESTORE
+  INTEGRATION_UPDATE
+  SETTINGS_UPDATE
+  SYNC
+  SECURITY_DENIED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique @db.VarChar(190)
+  name         String   @db.VarChar(120)
+  passwordHash String   @db.VarChar(255)
+  role         UserRole @default(OWNER)
+  disabled     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.DateTime(3)
+  updatedAt    DateTime @updatedAt @db.DateTime(3)
+  lastLoginAt  DateTime? @db.DateTime(3)
+
+  sessions     Session[]
+  projects     Project[]
+  runs         TestRun[]
+  notifications Notification[]
+  auditLogs    AuditLog[]
+  settings     UserSetting?
+  repairs      RepairProposal[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique @db.VarChar(64)
+  csrfToken String   @db.VarChar(64)
+  ip        String?  @db.VarChar(64)
+  userAgent String?  @db.VarChar(255)
+  expiresAt DateTime @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  lastSeenAt DateTime @default(now()) @db.DateTime(3)
+  revokedAt DateTime? @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("sessions")
+}
+
+model Project {
+  id            String       @id @default(cuid())
+  ownerId       String
+  name          String       @db.VarChar(160)
+  description   String?      @db.Text
+  sourceType    SourceType   @default(LOCAL)
+  rootPath      String?      @db.VarChar(1024)
+  repoUrl       String?      @db.VarChar(1024)
+  websiteUrl    String?      @db.VarChar(1024)
+  defaultBranch String?      @db.VarChar(190)
+  pinned        Boolean      @default(false)
+  archived      Boolean      @default(false)
+  health        HealthStatus @default(UNKNOWN)
+  detectionJson Json?
+  lastVerifiedAt DateTime?   @db.DateTime(3)
+  createdAt     DateTime     @default(now()) @db.DateTime(3)
+  updatedAt     DateTime     @updatedAt @db.DateTime(3)
+
+  owner        User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  environments ProjectEnvironment[]
+  adapters     ProjectAdapter[]
+  plans        TestPlan[]
+  cases        TestCase[]
+  runs         TestRun[]
+  integrations Integration[]
+  repairs      RepairProposal[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId, archived])
+  @@map("projects")
+}
+
+model ProjectEnvironment {
+  id         String          @id @default(cuid())
+  projectId  String
+  name       String          @db.VarChar(80)
+  kind       EnvironmentKind @default(LOCAL)
+  baseUrl    String?         @db.VarChar(1024)
+  variables  Json?
+  isDefault  Boolean         @default(false)
+  createdAt  DateTime        @default(now()) @db.DateTime(3)
+  updatedAt  DateTime        @updatedAt @db.DateTime(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@map("project_environments")
+}
+
+model ProjectAdapter {
+  id         String   @id @default(cuid())
+  projectId  String
+  adapterId  String   @db.VarChar(80)
+  version    String   @db.VarChar(40)
+  enabled    Boolean  @default(true)
+  configJson Json?
+  detectedAt DateTime @default(now()) @db.DateTime(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, adapterId])
+  @@map("project_adapters")
+}
+
+model TestPlan {
+  id                 String       @id @default(cuid())
+  projectId          String
+  strategy           PlanStrategy @default(FULL)
+  coverageConfidence String       @db.VarChar(20)
+  planJson           Json
+  notesJson          Json?
+  unverifiedJson     Json?
+  createdAt          DateTime     @default(now()) @db.DateTime(3)
+
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs    TestRun[]
+
+  @@index([projectId, createdAt])
+  @@map("test_plans")
+}
+
+model TestCase {
+  id               String      @id @default(cuid())
+  projectId        String
+  key              String      @db.VarChar(190)
+  title            String      @db.VarChar(255)
+  kind             String      @db.VarChar(40)
+  adapterId        String      @db.VarChar(80)
+  source           TestSource  @default(DETECTED)
+  reason           String?     @db.Text
+  configJson       Json?
+  enabled          Boolean     @default(true)
+  requiresApproval Boolean     @default(true)
+  mappedFiles      Json?
+  tags             Json?
+  priority         Int         @default(50)
+  createdAt        DateTime    @default(now()) @db.DateTime(3)
+  updatedAt        DateTime    @updatedAt @db.DateTime(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+  @@index([projectId, kind])
+  @@map("test_cases")
+}
+
+model TestRun {
+  id                   String     @id @default(cuid())
+  projectId            String
+  planId               String?
+  userId               String?
+  trigger              RunTrigger @default(MANUAL)
+  status               RunStatus  @default(QUEUED)
+  strategy             PlanStrategy @default(FULL)
+  gitCommit            String?    @db.VarChar(64)
+  gitBranch            String?    @db.VarChar(190)
+  environmentJson      Json
+  totalCount           Int        @default(0)
+  passedCount          Int        @default(0)
+  failedCount          Int        @default(0)
+  blockedCount         Int        @default(0)
+  unverifiedCount      Int        @default(0)
+  skippedCount         Int        @default(0)
+  durationMs           Int        @default(0)
+  verifiedScope        String?    @db.Text
+  limitationsJson      Json?
+  errorMessage         String?    @db.Text
+  startedAt            DateTime   @default(now()) @db.DateTime(3)
+  finishedAt           DateTime?  @db.DateTime(3)
+  createdAt            DateTime   @default(now()) @db.DateTime(3)
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plan    TestPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  results TestResult[]
+  evidence EvidenceArtifact[]
+  reports VerificationReport[]
+  capsules FailureCapsule[]
+  repairs RepairProposal[]
+
+  @@index([projectId, startedAt])
+  @@index([status, startedAt])
+  @@map("test_runs")
+}
+
+model TestResult {
+  id             String       @id @default(cuid())
+  runId          String
+  key            String       @db.VarChar(190)
+  title          String       @db.VarChar(255)
+  kind           String       @db.VarChar(40)
+  adapterId      String       @db.VarChar(80)
+  status         ResultStatus
+  durationMs     Int          @default(0)
+  exitCode       Int?
+  commandDisplay String?      @db.Text
+  stdout         String?      @db.MediumText
+  stderr         String?      @db.MediumText
+  classification String?      @db.VarChar(80)
+  message        String?      @db.Text
+  metadataJson   Json?
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+
+  run        TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  assertions TestAssertion[]
+  evidence   EvidenceArtifact[]
+  capsule    FailureCapsule?
+
+  @@unique([runId, key])
+  @@index([runId, status])
+  @@map("test_results")
+}
+
+model TestAssertion {
+  id         String       @id @default(cuid())
+  resultId   String
+  name       String       @db.VarChar(500)
+  status     ResultStatus
+  expected   String?      @db.Text
+  actual     String?      @db.Text
+  message    String?      @db.Text
+  durationMs Int?
+  createdAt  DateTime     @default(now()) @db.DateTime(3)
+
+  result TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([resultId, status])
+  @@map("test_assertions")
+}
+
+model EvidenceArtifact {
+  id           String       @id @default(cuid())
+  runId        String
+  resultId     String?
+  kind         EvidenceKind
+  name         String       @db.VarChar(255)
+  relativePath String       @db.VarChar(1024)
+  mimeType     String       @db.VarChar(120)
+  sizeBytes    BigInt       @default(0)
+  sha256       String       @db.VarChar(64)
+  createdAt    DateTime     @default(now()) @db.DateTime(3)
+
+  run    TestRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  result TestResult? @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sha256])
+  @@map("evidence_artifacts")
+}
+
+model VerificationReport {
+  id           String       @id @default(cuid())
+  runId        String
+  format       ReportFormat
+  relativePath String       @db.VarChar(1024)
+  sha256       String       @db.VarChar(64)
+  manifestJson Json?
+  generatedBy  String       @db.VarChar(120)
+  generatedAt  DateTime     @default(now()) @db.DateTime(3)
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, format])
+  @@map("verification_reports")
+}
+
+model FailureCapsule {
+  id           String   @id @default(cuid())
+  runId        String
+  resultId     String?  @unique
+  testKey      String   @db.VarChar(190)
+  relativePath String   @db.VarChar(1024)
+  sha256       String   @db.VarChar(64)
+  formatVersion Int     @default(1)
+  redactions   Int      @default(0)
+  createdAt    DateTime @default(now()) @db.DateTime(3)
+
+  run    TestRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  result TestResult? @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("failure_capsules")
+}
+
+model RepairProposal {
+  id             String       @id @default(cuid())
+  projectId      String
+  runId          String
+  userId         String?
+  testKey        String       @db.VarChar(190)
+  classification String       @db.VarChar(80)
+  causesJson     Json?
+  diff           String       @db.LongText
+  filesJson      Json?
+  status         RepairStatus @default(PROPOSED)
+  retestRunId    String?
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now()) @db.DateTime(3)
+  appliedAt      DateTime?    @db.DateTime(3)
+  verifiedAt     DateTime?    @db.DateTime(3)
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     TestRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@map("repair_proposals")
+}
+
+model Integration {
+  id             String          @id @default(cuid())
+  projectId      String?
+  type           IntegrationType
+  name           String          @db.VarChar(120)
+  configJson     Json?
+  enabled        Boolean         @default(true)
+  status         String?         @db.VarChar(40)
+  lastCheckedAt  DateTime?       @db.DateTime(3)
+  createdAt      DateTime        @default(now()) @db.DateTime(3)
+  updatedAt      DateTime        @updatedAt @db.DateTime(3)
+
+  project     Project?                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  credentials IntegrationCredentialMeta[]
+
+  @@unique([projectId, type, name])
+  @@map("integrations")
+}
+
+model IntegrationCredentialMeta {
+  id            String            @id @default(cuid())
+  integrationId String
+  keyName       String            @db.VarChar(80)
+  storage       CredentialStorage @default(ENCRYPTED_FILE)
+  fingerprint   String            @db.VarChar(64)
+  createdAt     DateTime          @default(now()) @db.DateTime(3)
+  rotatedAt     DateTime?         @db.DateTime(3)
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, keyName])
+  @@map("integration_credentials_metadata")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @db.VarChar(60)
+  title     String   @db.VarChar(200)
+  body      String?  @db.Text
+  readAt    DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  action     AuditAction
+  entityType String      @db.VarChar(80)
+  entityId   String?     @db.VarChar(80)
+  metadata   Json?
+  ip         String?     @db.VarChar(64)
+  createdAt  DateTime    @default(now()) @db.DateTime(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, action])
+  @@map("audit_logs")
+}
+
+model SyncQueue {
+  id             String     @id @default(cuid())
+  userId         String
+  clientId       String     @db.VarChar(120)
+  type           String     @db.VarChar(60)
+  payloadJson    Json
+  status         SyncStatus @default(PENDING)
+  attempts       Int        @default(0)
+  lastError      String?    @db.Text
+  idempotencyKey String     @unique @db.VarChar(190)
+  createdAt      DateTime   @default(now()) @db.DateTime(3)
+  syncedAt       DateTime?  @db.DateTime(3)
+
+  @@index([userId, status])
+  @@map("sync_queue")
+}
+
+model UserSetting {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  settingsJson Json
+  updatedAt    DateTime @updatedAt @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model DbBackup {
+  id        String   @id @default(cuid())
+  fileName  String   @db.VarChar(255)
+  path      String   @db.VarChar(1024)
+  sizeBytes BigInt
+  sha256    String   @db.VarChar(64)
+  verified  Boolean  @default(false)
+  message   String?  @db.Text
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  @@index([createdAt])
+  @@map("db_backups")
+}
+
+model DbHealthCheck {
+  id        String   @id @default(cuid())
+  readOk    Boolean
+  writeOk   Boolean
+  latencyMs Int
+  checkedAt DateTime @default(now()) @db.DateTime(3)
+
+  @@index([checkedAt])
+  @@map("db_health_checks")
+}
+
+model DeploymentLock {
+  name      String   @id @db.VarChar(80)
+  owner     String   @db.VarChar(120)
+  lockedAt  DateTime @default(now()) @db.DateTime(3)
+  expiresAt DateTime @db.DateTime(3)
+
+  @@map("deployment_locks")
+}
