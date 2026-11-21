@@ -47,6 +47,7 @@
     "update:keys": "tsx scripts/update-keys.ts",
     "update:release": "tsx scripts/update-release.ts",
     "update:server": "node scripts/update-server.mjs",
+    "demo:record": "node scripts/record-demo-video.mjs",
     "verify:all": "node scripts/verify-all.mjs"
   },
   "devDependencies": {
